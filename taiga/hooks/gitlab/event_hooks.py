@@ -33,16 +33,29 @@ from .services import get_gitlab_user
 
 
 class PushEventHook(BaseEventHook):
+    pusher = {}
+
     def process_event(self):
         if self.payload is None:
             return
 
+        self.pusher = {
+            "id": self.payload.get("user_id", None),
+            "name": self.payload.get("user_name", None),
+            "email": self.payload.get("user_email", None),
+            "user": None
+        }
+
+        pusher_user = get_gitlab_user(self.payload.get("user_email", None))
+
+        if pusher_user is not None and not pusher_user.is_system:
+            self.pusher['user'] = pusher_user
+
         commits = self.payload.get("commits", [])
         for commit in commits:
-            message = commit.get("message", None)
-            self._process_message(message, None)
+            self._process_commit(commit)
 
-    def _process_message(self, message, gitlab_user):
+    def _process_commit(self, commit):
         """
           The message we will be looking for seems like
             TG-XX #yyyyyy
@@ -50,16 +63,20 @@ class PushEventHook(BaseEventHook):
             XX: is the ref for us, issue or task
             yyyyyy: is the status slug we are setting
         """
+        message = commit.get("message", None)
+
         if message is None:
             return
+
+        author = commit.get("author", {})
 
         p = re.compile("tg-(\d+) +#([-\w]+)")
         for m in p.finditer(message.lower()):
             ref = m.group(1)
             status_slug = m.group(2)
-            self._change_status(ref, status_slug, gitlab_user)
+            self._change_status(ref, status_slug, author, commit)
 
-    def _change_status(self, ref, status_slug, gitlab_user):
+    def _change_status(self, ref, status_slug, author, commit):
         if Issue.objects.filter(project=self.project, ref=ref).exists():
             modelClass = Issue
             statusClass = IssueStatus
@@ -82,9 +99,58 @@ class PushEventHook(BaseEventHook):
         element.status = status
         element.save()
 
+        author_email = author.get('email', None)
+        author_name = author.get('name', None)
+        author_user = get_gitlab_user(author_email)
+
+        commit_id = commit.get("id", None)
+        commit_url = commit.get("url", None)
+        # this always exists because of checks in the caller
+        commit_message = commit.get("message").strip()
+
+        if author_email != self.pusher.get('email'):
+            if self.pusher.get('user') is not None:
+                user = self.pusher.get('user')
+                pushed_by = _(" (Pushed by @{pusher_username})").format(
+                    pusher_username=user.get_username()
+                )
+            else:
+                pushed_by = _(" (Pushed by [{pusher_username}](mailto:{pusher_url}))").format(
+                    pusher_username=self.pusher.get('name'),
+                    pusher_url=self.pusher.get('email')
+                )
+        else:
+            pushed_by = ""
+
+        if commit_id and commit_url:
+            if author_user is not None and not author_user.is_system:
+                """ We can use a real user """
+
+                comment = _("@{author_id} changed status to \"{status}\" "
+                            "from GitLab commit [{commit_id}]({commit_url})" + pushed_by + ":\n\n"
+                            "> {commit_message}").format(
+                                                            author_id=author_user.username,
+                                                            status=status.name,
+                                                            commit_id=commit_id[:7],
+                                                            commit_url=commit_url,
+                                                            commit_message=commit_message)
+
+            elif author_name and author_email:
+                comment = _("[{author_name}](mailto:{author_email}) changed status to \"{status}\" "
+                            "from GitLab commit [{commit_id}]({commit_url})" + pushed_by + ":\n\n"
+                            "> {commit_message}").format(
+                                                            author_name=author_name,
+                                                            status=status.name,
+                                                            author_email=author_email,
+                                                            commit_id=commit_id[:7],
+                                                            commit_url=commit_url,
+                                                            commit_message=commit_message)
+        else:
+                comment = _("Status changed via GitLab commit.")
+
         snapshot = take_snapshot(element,
-                                 comment=_("Status changed from GitLab commit"),
-                                 user=get_gitlab_user(gitlab_user))
+                                 comment=comment,
+                                 user=author_user)
         send_notifications(element, history=snapshot)
 
 
