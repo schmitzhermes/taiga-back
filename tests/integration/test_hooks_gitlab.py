@@ -149,7 +149,10 @@ def test_push_event_issue_processing(client):
         {"message": """test message
             test   TG-%s    #%s   ok
             bye!
-        """ % (issue.ref, new_status.slug)},
+        """ % (issue.ref, new_status.slug),
+         "id": 123,
+         "url": "http://gitlab.com/test/project/issues/123",
+         }
     ]}
     mail.outbox = []
     ev_hook = event_hooks.PushEventHook(issue.project, payload)
@@ -169,7 +172,10 @@ def test_push_event_task_processing(client):
         {"message": """test message
             test   TG-%s    #%s   ok
             bye!
-        """ % (task.ref, new_status.slug)},
+        """ % (task.ref, new_status.slug),
+         "id": 123,
+         "url": "http://gitlab.com/test/project/issues/123",
+         }
     ]}
     mail.outbox = []
     ev_hook = event_hooks.PushEventHook(task.project, payload)
@@ -189,7 +195,10 @@ def test_push_event_user_story_processing(client):
         {"message": """test message
             test   TG-%s    #%s   ok
             bye!
-        """ % (user_story.ref, new_status.slug)},
+        """ % (user_story.ref, new_status.slug),
+         "id": 123,
+         "url": "http://gitlab.com/test/project/issues/123",
+         }
     ]}
 
     mail.outbox = []
@@ -212,7 +221,10 @@ def test_push_event_multiple_actions(client):
             test   TG-%s    #%s   ok
             test   TG-%s    #%s   ok
             bye!
-        """ % (issue1.ref, new_status.slug, issue2.ref, new_status.slug)},
+        """ % (issue1.ref, new_status.slug, issue2.ref, new_status.slug),
+         "id": 123,
+         "url": "http://gitlab.com/test/project/issues/123",
+         }
     ]}
     mail.outbox = []
     ev_hook1 = event_hooks.PushEventHook(issue1.project, payload)
@@ -234,7 +246,10 @@ def test_push_event_processing_case_insensitive(client):
         {"message": """test message
             test   tg-%s    #%s   ok
             bye!
-        """ % (task.ref, new_status.slug.upper())},
+        """ % (task.ref, new_status.slug.upper()),
+         "id": 123,
+         "url": "http://gitlab.com/test/project/issues/123",
+         }
     ]}
     mail.outbox = []
     ev_hook = event_hooks.PushEventHook(task.project, payload)
@@ -250,7 +265,10 @@ def test_push_event_task_bad_processing_non_existing_ref(client):
         {"message": """test message
             test   TG-6666666    #%s   ok
             bye!
-        """ % (issue_status.slug)},
+        """ % (issue_status.slug),
+         "id": 123,
+         "url": "http://gitlab.com/test/project/issues/123",
+         }
     ]}
     mail.outbox = []
 
@@ -268,7 +286,10 @@ def test_push_event_us_bad_processing_non_existing_status(client):
         {"message": """test message
             test   TG-%s    #non-existing-slug   ok
             bye!
-        """ % (user_story.ref)},
+        """ % (user_story.ref),
+         "id": 123,
+         "url": "http://gitlab.com/test/project/issues/123",
+         }
     ]}
 
     mail.outbox = []
@@ -287,7 +308,10 @@ def test_push_event_bad_processing_non_existing_status(client):
         {"message": """test message
             test   TG-%s    #non-existing-slug   ok
             bye!
-        """ % (issue.ref)},
+        """ % (issue.ref),
+         "id": 123,
+         "url": "http://gitlab.com/test/project/issues/1",
+         }
     ]}
 
     mail.outbox = []
@@ -319,6 +343,7 @@ def test_issues_event_opened_issue(client):
             "description": "test-body",
             "url": "http://gitlab.com/test/project/issues/11",
             "action": "open",
+            "iid": 123
         },
     }
 
@@ -346,6 +371,7 @@ def test_issues_event_other_than_opened_issue(client):
             "description": "test-body",
             "url": "http://gitlab.com/test/project/issues/11",
             "action": "update",
+            "iid": 123
         },
     }
 
