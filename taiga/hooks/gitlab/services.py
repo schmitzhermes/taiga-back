@@ -55,3 +55,44 @@ def get_gitlab_user(user_email):
         user = get_user_model().objects.get(is_system=True, username__startswith="gitlab")
 
     return user
+
+
+def get_user_info_from_payload(payload):
+    # gitlab's API is very inconsistent
+    # try to normalize it
+    r = {
+        "remote_id": None,
+        "remote_username": None,
+        "name": None,
+        "email": None,
+        "url": None,
+        "user": None
+    }
+
+    # if user is set, it has a standard format that does not include an email
+    # @todo Add setting to map remote username like GitHub has?
+    if "user" in payload:
+        r.update({
+            "remote_username": payload.get("user").get("username"),
+            "name": payload.get("user").get("name"),
+            "user": get_gitlab_user(None)
+        })
+    else:
+        r.update({
+            "remote_id": payload.get("user_id"),
+            # in this case, user_name is a display name, not a username
+            "name": payload.get("user_name"),
+            # only push events (and their commits) have a user email set
+            "email": payload.get("user_email")
+        })
+
+    if "email" in r:
+        r.update({
+            "url": "mailto:{}".format(r.get("email"))
+        })
+
+    r.update({
+        "user": get_gitlab_user(r.get("email"))
+    })
+
+    return r
